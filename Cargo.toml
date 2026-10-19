@@ -4,3 +4,14 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+gethostname = "1.1.0"
+opentelemetry = "0.33.1"
+opentelemetry-appender-tracing = "0.33.1"
+opentelemetry-otlp = "0.33.1"
+opentelemetry_sdk = "0.33.1"
+tracing = "0.1.44"
+tracing-opentelemetry = "0.34.0"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+
+[dev-dependencies]
+tokio = { version = "1.53.3", features = ["rt-multi-thread", "macros"] }
