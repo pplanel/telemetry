@@ -82,8 +82,17 @@ impl Providers {
     }
 }
 
-fn exporter_err(e: impl std::fmt::Display) -> Error {
-    Error::Exporter(e.to_string())
+/// A signal whose exporter cannot be built is off, with one line on stderr. A
+/// malformed endpoint, or a host program that left out something the HTTP
+/// client needs, must not stop the service.
+fn skip<T>(signal: &str, built: Result<T, impl std::fmt::Display>) -> Option<T> {
+    match built {
+        Ok(exporter) => Some(exporter),
+        Err(error) => {
+            eprintln!("telemetry: {signal} export disabled: {error}");
+            None
+        }
+    }
 }
 
 /// Build the providers for the signals that have an endpoint, and the layers
@@ -96,13 +105,19 @@ where
     let mut layers: Vec<BoxLayer<S>> = Vec::new();
     let mut providers = Providers::default();
 
-    if enabled(Signal::Traces) {
+    if let Some(exporter) = enabled(Signal::Traces)
+        .then(|| {
+            skip(
+                "traces",
+                SpanExporter::builder()
+                    .with_http()
+                    .with_protocol(Protocol::HttpBinary)
+                    .build(),
+            )
+        })
+        .flatten()
+    {
         // The batch processors are bounded queues that drop when full.
-        let exporter = SpanExporter::builder()
-            .with_http()
-            .with_protocol(Protocol::HttpBinary)
-            .build()
-            .map_err(exporter_err)?;
         let provider = SdkTracerProvider::builder()
             .with_resource(resource.clone())
             .with_batch_exporter(exporter)
@@ -118,12 +133,18 @@ where
         providers.tracer = Some(provider);
     }
 
-    if enabled(Signal::Logs) {
-        let exporter = LogExporter::builder()
-            .with_http()
-            .with_protocol(Protocol::HttpBinary)
-            .build()
-            .map_err(exporter_err)?;
+    if let Some(exporter) = enabled(Signal::Logs)
+        .then(|| {
+            skip(
+                "logs",
+                LogExporter::builder()
+                    .with_http()
+                    .with_protocol(Protocol::HttpBinary)
+                    .build(),
+            )
+        })
+        .flatten()
+    {
         let provider = SdkLoggerProvider::builder()
             .with_resource(resource.clone())
             .with_batch_exporter(exporter)
@@ -139,12 +160,18 @@ where
         providers.logger = Some(provider);
     }
 
-    if enabled(Signal::Metrics) {
-        let exporter = MetricExporter::builder()
-            .with_http()
-            .with_protocol(Protocol::HttpBinary)
-            .build()
-            .map_err(exporter_err)?;
+    if let Some(exporter) = enabled(Signal::Metrics)
+        .then(|| {
+            skip(
+                "metrics",
+                MetricExporter::builder()
+                    .with_http()
+                    .with_protocol(Protocol::HttpBinary)
+                    .build(),
+            )
+        })
+        .flatten()
+    {
         let provider = SdkMeterProvider::builder()
             .with_resource(resource)
             .with_periodic_exporter(exporter)
@@ -153,9 +180,10 @@ where
         providers.meter = Some(provider);
     }
 
-    if providers.tracer.is_some() || providers.logger.is_some() || providers.meter.is_some() {
-        layers.push(ExportWarning::default().boxed());
-    }
+    // Always present, even with nothing exported. It is also what keeps the
+    // list from being empty: an empty `Vec<Layer>` reports "never interested"
+    // to `tracing`, which would silence every other layer of the subscriber.
+    layers.push(ExportWarning::default().boxed());
 
     Ok((layers, providers))
 }

@@ -17,8 +17,8 @@ use std::io::IsTerminal;
 use tracing_subscriber::filter::filter_fn;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::registry::LookupSpan;
-use tracing_subscriber::{EnvFilter, Layer};
 use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::{EnvFilter, Layer};
 
 /// A boxed layer, as returned by [`layers`].
 pub type BoxLayer<S> = Box<dyn Layer<S> + Send + Sync + 'static>;
@@ -46,8 +46,6 @@ macro_rules! service {
 pub enum Error {
     /// `RUST_LOG` could not be parsed.
     Filter(tracing_subscriber::filter::ParseError),
-    /// An OTLP exporter could not be built (a malformed endpoint, say).
-    Exporter(String),
     /// A global subscriber was already installed.
     Install(tracing_subscriber::util::TryInitError),
 }
@@ -56,7 +54,6 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::Filter(e) => write!(f, "invalid RUST_LOG: {e}"),
-            Error::Exporter(e) => write!(f, "building OTLP exporter: {e}"),
             Error::Install(e) => write!(f, "installing tracing subscriber: {e}"),
         }
     }
@@ -66,7 +63,6 @@ impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Error::Filter(e) => Some(e),
-            Error::Exporter(_) => None,
             Error::Install(e) => Some(e),
         }
     }
@@ -126,7 +122,10 @@ fn env_filter() -> Result<EnvFilter, Error> {
 /// filter, so it does not change what your other layers see. Metrics are set
 /// up as a side effect (see [`Guard::meter_provider`]).
 ///
-/// With no endpoint set the vector is empty. Keep the [`Guard`] alive.
+/// Never empty: with no endpoint set it holds one quiet layer. (An empty
+/// `Vec<Layer>` would tell `tracing` that nothing is enabled and silence your
+/// other layers.) A signal whose exporter cannot be built is switched off with
+/// a line on stderr. Keep the [`Guard`] alive.
 pub fn layers<S>(service: Service) -> Result<(Vec<BoxLayer<S>>, Guard), Error>
 where
     S: tracing::Subscriber + for<'a> LookupSpan<'a> + Send + Sync,

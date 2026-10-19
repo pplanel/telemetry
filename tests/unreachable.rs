@@ -18,10 +18,17 @@ fn unreachable_backend_costs_one_warning() {
         .unwrap();
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(out.status.success(), "child failed:\n{stderr}");
-    assert!(stderr.contains("still running"), "service log missing:\n{stderr}");
+    assert!(
+        stderr.contains("still running"),
+        "service log missing:\n{stderr}"
+    );
     let warnings = stderr.matches("telemetry: export problem").count();
     assert_eq!(warnings, 1, "expected one export warning:\n{stderr}");
-    assert_eq!(out.stdout.windows(5).filter(|w| *w == b"probe").count(), 0, "wrote to stdout");
+    assert_eq!(
+        out.stdout.windows(5).filter(|w| *w == b"probe").count(),
+        0,
+        "wrote to stdout"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -34,6 +41,9 @@ async fn child() {
     for i in 0..50 {
         tracing::info_span!("work", i).in_scope(|| tracing::info!("still running"));
     }
-    opentelemetry::global::meter("probe").u64_counter("probe.count").build().add(1, &[]);
+    opentelemetry::global::meter("probe")
+        .u64_counter("probe.count")
+        .build()
+        .add(1, &[]);
     drop(guard);
 }

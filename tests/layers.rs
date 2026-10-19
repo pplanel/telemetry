@@ -22,12 +22,17 @@ fn layers_follow_the_endpoint_and_install_nothing() {
     }
 
     let (none, guard) = telemetry::layers::<Registry>(telemetry::service!("airshell")).unwrap();
-    assert!(none.is_empty(), "no endpoint must mean no layers");
+    assert_eq!(none.len(), 1, "no endpoint: only the quiet layer");
     assert!(guard.meter_provider().is_none());
     drop(guard);
 
-    // Only the traces endpoint: one signal, plus the export-warning layer.
-    unsafe { std::env::set_var("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "http://127.0.0.1:1/v1/traces") };
+    // Only the traces endpoint: the traces layer, plus the quiet one.
+    unsafe {
+        std::env::set_var(
+            "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+            "http://127.0.0.1:1/v1/traces",
+        )
+    };
     let (traces_only, guard) =
         telemetry::layers::<Registry>(telemetry::service!("airshell")).unwrap();
     assert_eq!(traces_only.len(), 2);
