@@ -9,10 +9,24 @@ dashboard join a ghola ingest, the airshell connection it went over and the
 nixcache request behind its build.
 
 Status: `init()`, `layers()` and OTLP export for logs, spans and metrics
-work and are tested against a dead endpoint; not yet against the real
-backend on imperium. Repo: github.com/pplanel/telemetry (not created yet). The plan this belongs to,
+work. airshell, nixcache and ghola use it (merged 2026-10-19, pinned at
+`d94083d`); only against a dead endpoint so far, not yet the real backend on
+imperium, and no `OTEL_*` is set on any Mac yet (nix-darwin, step 2). Repo:
+github.com/pplanel/telemetry (public). The plan this belongs to,
 "observability for every service", is in nix-darwin's CLAUDE.md (decided
 2026-10-19). This crate is step 3 of it.
+
+Two things that bit while wiring the consumers, kept here so they don't again:
+
+- **Never attach an empty set of layers.** `Vec<Layer>` (and `Option::None`)
+  tell `tracing` "interested in nothing", which silences the subscriber's
+  other layers. `layers()` always returns one quiet layer for that reason.
+  Test a service with no `OTEL_*` set by looking at its stderr, not only with
+  an endpoint.
+- **The exporter builds a blocking HTTP client**, which needs whatever the
+  host program's `reqwest` needs. nixcache compiles reqwest without a rustls
+  provider, so it installs one before `init()`. A signal whose exporter can't
+  be built is switched off with one stderr line; it never fails `init()`.
 
 ## Where the data goes
 
