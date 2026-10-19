@@ -8,8 +8,9 @@ and the same flush on exit. Those shared names are what let one Grafana
 dashboard join a ghola ingest, the airshell connection it went over and the
 nixcache request behind its build.
 
-Status: design, no code yet (only `cargo new --lib`). Repo:
-github.com/pplanel/telemetry (not created yet). The plan this belongs to,
+Status: `init()`, `layers()` and OTLP export for logs, spans and metrics
+work and are tested against a dead endpoint; not yet against the real
+backend on imperium. Repo: github.com/pplanel/telemetry (not created yet). The plan this belongs to,
 "observability for every service", is in nix-darwin's CLAUDE.md (decided
 2026-10-19). This crate is step 3 of it.
 
